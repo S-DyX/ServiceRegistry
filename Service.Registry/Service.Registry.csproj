@@ -7,7 +7,7 @@
     <Version>3.1.47</Version>
     <Copyright>Stanislav Batyrgareev</Copyright>
     <Description>Service registry for rest hosts</Description>
-    <PackageProjectUrl>https://github.com/S-DyX/ServiceRegistry.git</PackageProjectUrl>
+    <PackageProjectUrl>https://bsasearch.org/serviceregistry.html</PackageProjectUrl>
     <RepositoryUrl>https://github.com/S-DyX/ServiceRegistry.git</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
