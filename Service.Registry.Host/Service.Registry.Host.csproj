@@ -5,7 +5,7 @@
     <Platforms>AnyCPU;x64</Platforms>
     <StartupObject>Service.Registry.Host.Program</StartupObject>
     <Copyright>Stanislav Batyrgareev</Copyright>
-    <Version>3.1.46</Version>
+    <Version>3.1.47</Version>
     <PackageProjectUrl>https://bitbucket.org/SBatyrgareev/serviceregistry/src</PackageProjectUrl>
     <RepositoryUrl>https://bitbucket.org/SBatyrgareev/serviceregistry/src</RepositoryUrl>
     <UserSecretsId>d65d2e5d-2a71-48e8-bbfd-ed62d56ba7d8</UserSecretsId>

@@ -1,10 +1,9 @@
-﻿using Service.Registry.Common;
+﻿using Service.Registry.Common.Entities;
 using Service.Registry.Impl.Settings;
 using Service.Registry.Interfaces.Ver001;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Service.Registry.Common.Entities;
 
 namespace Service.Registry.Impl.Services.Ver001
 {
@@ -32,14 +31,7 @@ namespace Service.Registry.Impl.Services.Ver001
 			var result = responses.First();
 			result.CallCount++;
 			var data = responses.First();
-			var restClient = new ServiceClient()
-			{
-				CallCount = result.CallCount,
-				Host = data.Host,
-				Name = data.Id,
-				Address = data.Address,
-				Port = data.Port
-			};
+			var restClient = Map(data);
 			return restClient;
 
 		}
@@ -62,12 +54,47 @@ namespace Service.Registry.Impl.Services.Ver001
 
 		public List<ServiceClient> GetAllRestClient(string name)
 		{
-			return _serviceClientContainer.GetAllRestClient(name);
+			if (!_clientSettings.Clients.ContainsKey(name))
+				return null;
+
+			var responses = _clientSettings.Clients[name];
+			var result = new List<ServiceClient>(responses.Count);
+			foreach (var data in responses)
+			{
+				var restClient = Map(data);
+				result.Add(restClient);
+
+			}
+			return result;
 		}
 
 		public List<ServiceClient> GetRestClients()
 		{
-			return _serviceClientContainer.GetRestClients();
+			var responses = _clientSettings.Clients;
+			var result = new List<ServiceClient>(responses.Count);
+			foreach (var list in responses.Values)
+			{
+				foreach (var data in list)
+				{
+					var restClient = Map(data);
+					result.Add(restClient);
+				}
+			}
+
+			return result;
+		}
+
+		private static ServiceClient Map(CommonClientResponse data)
+		{
+			var restClient = new ServiceClient()
+			{
+				CallCount = data.CallCount,
+				Host = data.Host,
+				Name = data.Id,
+				Address = data.Address,
+				Port = data.Port
+			};
+			return restClient;
 		}
 	}
 }
