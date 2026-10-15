@@ -1,12 +1,12 @@
 #See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 WORKDIR /app
 # listen on all interfaces inside the container (appsettings.json has localhost)
 ENV ServiceRegistry__Host=http://+:7777
 EXPOSE 7777
 
-FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 COPY ["Service.Registry.Host/Service.Registry.Host.csproj", "Service.Registry.Host/"]
 COPY ["Service.Registry.Impl/Service.Registry.Impl.csproj", "Service.Registry.Impl/"]
