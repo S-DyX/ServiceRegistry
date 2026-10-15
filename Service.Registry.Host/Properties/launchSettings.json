@@ -25,7 +25,7 @@
       "launchBrowser": true,
       "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}/api/service/all",
       "environmentVariables": {
-        "ServiceRegistry__Host": "http://+:80"
+        "ServiceRegistry__Host": "http://+:8080"
       },
       "httpPort": 7777
     }
