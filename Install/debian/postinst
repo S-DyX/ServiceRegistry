@@ -1,0 +1,33 @@
+#!/bin/sh
+set -e
+
+SERVICE_USER=bsaserviceregistry
+SERVICE=bsa-serviceregistry.service
+
+case "$1" in
+	configure)
+		if ! getent group "$SERVICE_USER" >/dev/null; then
+			addgroup --system "$SERVICE_USER"
+		fi
+		if ! getent passwd "$SERVICE_USER" >/dev/null; then
+			adduser --system --ingroup "$SERVICE_USER" --home /nonexistent --no-create-home \
+				--shell /usr/sbin/nologin --gecos "BSA Service Registry" "$SERVICE_USER"
+		fi
+
+		# the application does not write to disk: /opt/bsa-serviceregistry stays owned by root,
+		# logs go to the systemd journal
+		chown root:"$SERVICE_USER" /etc/bsa-serviceregistry /etc/bsa-serviceregistry/*
+		chmod 0750 /etc/bsa-serviceregistry
+		chmod 0640 /etc/bsa-serviceregistry/*
+
+		if [ -d /run/systemd/system ]; then
+			systemctl daemon-reload
+			systemctl enable "$SERVICE" >/dev/null
+			systemctl restart "$SERVICE" || echo "bsa-serviceregistry: service did not start, see: journalctl -u $SERVICE"
+		fi
+		;;
+	abort-upgrade|abort-remove|abort-deconfigure)
+		;;
+esac
+
+exit 0

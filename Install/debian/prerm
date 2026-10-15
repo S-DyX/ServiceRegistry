@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+
+SERVICE=bsa-serviceregistry.service
+
+case "$1" in
+	remove|upgrade|deconfigure)
+		if [ -d /run/systemd/system ]; then
+			systemctl stop "$SERVICE" || true
+		fi
+		if [ "$1" = "remove" ] && [ -d /run/systemd/system ]; then
+			systemctl disable "$SERVICE" >/dev/null 2>&1 || true
+		fi
+		;;
+esac
+
+exit 0

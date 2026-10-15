@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+
+SERVICE_USER=bsaserviceregistry
+
+case "$1" in
+	remove)
+		if [ -d /run/systemd/system ]; then
+			systemctl daemon-reload || true
+		fi
+		;;
+	purge)
+		if getent passwd "$SERVICE_USER" >/dev/null; then
+			deluser --system "$SERVICE_USER" >/dev/null 2>&1 || true
+		fi
+		if getent group "$SERVICE_USER" >/dev/null; then
+			delgroup --system "$SERVICE_USER" >/dev/null 2>&1 || true
+		fi
+		if [ -d /run/systemd/system ]; then
+			systemctl daemon-reload || true
+		fi
+		;;
+esac
+
+exit 0

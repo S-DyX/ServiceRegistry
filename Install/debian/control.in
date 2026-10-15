@@ -1,0 +1,14 @@
+Package: bsa-serviceregistry
+Version: @VERSION@
+Section: web
+Priority: optional
+Architecture: @ARCH@
+Maintainer: Stanislav Batyrgareev <sbatyrgareev@gmail.com>
+Installed-Size: @SIZE@
+Depends: adduser, @DEPENDS@
+Homepage: https://bsasearch.org/serviceregistry.html
+Description: BSA Service Registry host - addresses of REST and TCP services
+ HTTP API (ASP.NET Core) that returns addresses of REST and TCP services by
+ name: services from the configuration and services registered at runtime,
+ with round-robin choice of the least used address.
+ Runs as the systemd service bsa-serviceregistry.
