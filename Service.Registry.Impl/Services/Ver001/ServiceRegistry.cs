@@ -16,17 +16,10 @@ namespace Service.Registry.Impl.Services.Ver001
 		/// <summary>
 		/// Ctor
 		/// </summary>
-		private ServiceRegistry()
-		{
-		}
-
-		/// <summary>
-		/// Ctor
-		/// </summary>
 		/// <param name="serviceRegistryClient"><see cref="IServiceRegistry"/></param>
 		public ServiceRegistry(IServiceRegistry serviceRegistryClient)
 		{
-			_serviceRegistryClient = serviceRegistryClient;
+			_serviceRegistryClient = serviceRegistryClient ?? throw new System.ArgumentNullException(nameof(serviceRegistryClient));
 		}
 
 

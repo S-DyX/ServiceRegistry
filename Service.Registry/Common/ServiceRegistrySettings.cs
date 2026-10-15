@@ -10,16 +10,14 @@ namespace Service.Registry.Common
 
 		public ServiceRegistrySettings()
 		{
-			var raw = GetSection();
-			if (raw == null)
-			{
-				var s = "\"serviceRegistry\": { \"address\": \"http://localhost:7777\" }";
-				throw new InvalidDataException($"Please add section {s} to file appsettings.json");
-			}
+			const string sample = "\"serviceRegistry\": { \"address\": \"http://localhost:7777\" }";
 
-			Address = raw.GetSection("address")?.Value;
-			if (Address!=null && Address.EndsWith("/"))
-				Address = Address.Substring(0, Address.Length - 1);
+			var raw = GetElement(true);
+			Address = raw?["address"]?.Trim();
+			if (string.IsNullOrEmpty(Address))
+				throw new InvalidDataException($"Please add section {sample} to file appsettings.json");
+
+			Address = Address.TrimEnd('/');
 		}
 		public string Address { get; private set; }
 	}

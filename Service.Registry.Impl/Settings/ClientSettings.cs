@@ -1,7 +1,9 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Service.Registry.Configurations;
-using Service.Registry.Interfaces.Ver001;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using Service.Registry.Common.Entities;
 
 
@@ -14,10 +16,12 @@ namespace Service.Registry.Impl.Settings
 		private readonly object _sync = new object();
 		private Dictionary<string, List<CommonClientResponse>> _clients;
 
+		/// <summary>
+		/// Ctor, section "Clients" is optional
+		/// </summary>
 		public ClientSettings()
 		{
-			_raw = GetSection();
-
+			_raw = GetElement(true);
 		}
 
 		public ClientSettings(IConfigurationSection raw)
@@ -27,44 +31,42 @@ namespace Service.Registry.Impl.Settings
 
 		private Dictionary<string, List<CommonClientResponse>> GetSettings(IConfigurationSection raw)
 		{
-			if (raw != null)
-			{
-				var rawClients = raw.GetChildren();
-
-				var clients = new Dictionary<string, List<CommonClientResponse>>();
-				foreach (var client in rawClients)
-				{
-					Init(client, clients);
-				}
+			var clients = new Dictionary<string, List<CommonClientResponse>>(StringComparer.Ordinal);
+			if (raw == null)
 				return clients;
-			}
 
-			return new Dictionary<string, List<CommonClientResponse>>(0);
+			foreach (var client in raw.GetChildren())
+			{
+				Init(client, clients);
+			}
+			return clients;
 		}
 
 		public void Init(IConfigurationSection client, Dictionary<string, List<CommonClientResponse>> clients)
 		{
-			var attributeId = client.GetSection("id");
-			var host = client.GetSection("host");
-			var data = client.GetSection("data");
-			var address = client.GetSection("address");
-			var port = client.GetSection("port");
+			var id = client["id"]?.Trim();
+			if (string.IsNullOrEmpty(id))
+				throw new InvalidDataException($"Configuration \"{client.Path}\": \"id\" is required.");
+
 			var response = new CommonClientResponse()
 			{
-				Id = attributeId.Value,
-				Host = host?.Value,
-				Data = data?.Value,
-				Address = address?.Value
+				Id = id,
+				Host = client["host"],
+				Data = client["data"],
+				Address = client["address"]
 			};
-			if (!string.IsNullOrEmpty(port?.Value))
-			{
-				response.Port = int.Parse(port.Value);
 
+			var port = client["port"];
+			if (!string.IsNullOrWhiteSpace(port))
+			{
+				if (!int.TryParse(port, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) || value <= 0 || value > 65535)
+					throw new InvalidDataException($"Configuration \"{client.Path}\" ({id}): invalid port \"{port}\".");
+				response.Port = value;
 			}
 
-			if (clients.ContainsKey(response.Id))
+			if (clients.TryGetValue(response.Id, out var list))
 			{
-				clients[response.Id].Add(response);
+				list.Add(response);
 			}
 			else
 			{

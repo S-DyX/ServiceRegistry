@@ -2,7 +2,9 @@
 using Service.Registry.Common;
 using Service.Registry.Common.Entities;
 using Service.Registry.Interfaces.Ver001;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Service.Registry.Host.Controllers
 {
@@ -11,10 +13,12 @@ namespace Service.Registry.Host.Controllers
 	public class ServiceController : ControllerBase
 	{
 		private readonly IServiceRegistry _serviceRegistry;
+		private readonly Lazy<ServiceRegistryFactory> _registryFactory;
 
-		public ServiceController(IServiceRegistry serviceRegistry)
+		public ServiceController(IServiceRegistry serviceRegistry, Lazy<ServiceRegistryFactory> registryFactory)
 		{
-			this._serviceRegistry = serviceRegistry;
+			_serviceRegistry = serviceRegistry;
+			_registryFactory = registryFactory;
 		}
 
 		[HttpGet]
@@ -31,15 +35,12 @@ namespace Service.Registry.Host.Controllers
 		{
 			if (string.IsNullOrWhiteSpace(name))
 			{
+				var clients = _serviceRegistry.GetRestClients();
+				return Ok(clients);
+			}
 
-				var client = _serviceRegistry.GetRestClients();
-				return Ok(client);
-			}
-			else
-			{
-				var client = _serviceRegistry.GetAllRestClient(name);
-				return Ok(client); 
-			}
+			var client = _serviceRegistry.GetAllRestClient(name);
+			return Ok(client);
 		}
 
 
@@ -47,15 +48,17 @@ namespace Service.Registry.Host.Controllers
 		[Route("Test")]
 		public IActionResult Test(string name)
 		{
-			var ss = new ServiceRegistryFactory().GetClientByFactory(name);
-			return Ok(ss);
+			var client = _registryFactory.Value.GetClientByFactory(name);
+			return Ok(client);
 		}
+
 		[HttpPost]
 		[Route("Register")]
 		public IActionResult Register([FromBody] List<ServiceClient> clients)
 		{
-			if (clients == null)
-				return BadRequest("empty clients");
+			var error = Validate(clients, requireEndpoint: true);
+			if (error != null)
+				return BadRequest(error);
 			_serviceRegistry.AddRestClients(clients);
 			return Ok();
 		}
@@ -64,10 +67,22 @@ namespace Service.Registry.Host.Controllers
 		[Route("Remove")]
 		public IActionResult Remove([FromBody] List<ServiceClient> clients)
 		{
-			if (clients == null)
-				return BadRequest("empty clients");
+			var error = Validate(clients, requireEndpoint: false);
+			if (error != null)
+				return BadRequest(error);
 			_serviceRegistry.RemoveRestClients(clients);
 			return Ok();
+		}
+
+		private static string Validate(List<ServiceClient> clients, bool requireEndpoint)
+		{
+			if (clients == null || clients.Count == 0)
+				return "empty clients";
+			if (clients.Any(x => x == null || string.IsNullOrWhiteSpace(x.Name)))
+				return "client name is required";
+			if (requireEndpoint && clients.Any(x => string.IsNullOrWhiteSpace(x.Host) && string.IsNullOrWhiteSpace(x.Address)))
+				return "client host or address is required";
+			return null;
 		}
 	}
 }

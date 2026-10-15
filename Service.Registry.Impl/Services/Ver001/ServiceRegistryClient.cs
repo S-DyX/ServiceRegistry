@@ -7,33 +7,30 @@ using System.Linq;
 
 namespace Service.Registry.Impl.Services.Ver001
 {
+	/// <summary>
+	/// Clients from the configuration (appsettings.json "Clients") and clients added by Register
+	/// are stored in one <see cref="ServiceClientContainer"/>
+	/// </summary>
 	public sealed class ServiceRegistryClient : IServiceRegistry
 	{
-
-		private readonly ClientSettings _clientSettings;
 		private readonly ServiceClientContainer _serviceClientContainer;
 
 		public ServiceRegistryClient(ClientSettings clientSettings, ServiceClientContainer serviceClientContainer)
 		{
 			if (clientSettings == null)
-				throw new ArgumentNullException("settings");
-			_clientSettings = clientSettings;
-			_serviceClientContainer = serviceClientContainer;
+				throw new ArgumentNullException(nameof(clientSettings));
+			_serviceClientContainer = serviceClientContainer ?? throw new ArgumentNullException(nameof(serviceClientContainer));
+
+			var configured = clientSettings.Clients.Values
+				.SelectMany(x => x)
+				.Select(Map)
+				.ToList();
+			_serviceClientContainer.AddRestClients(configured);
 		}
 
 		public ServiceClient GetClient(string name)
 		{
-			if (!_clientSettings.Clients.ContainsKey(name))
-				return null;
-
-			var responses = _clientSettings.Clients[name];
-			responses.Sort((left, right) => left.CallCount - right.CallCount);
-			var result = responses.First();
-			result.CallCount++;
-			var data = responses.First();
-			var restClient = Map(data);
-			return restClient;
-
+			return _serviceClientContainer.GetRestClient(name);
 		}
 
 
@@ -54,47 +51,23 @@ namespace Service.Registry.Impl.Services.Ver001
 
 		public List<ServiceClient> GetAllRestClient(string name)
 		{
-			if (!_clientSettings.Clients.ContainsKey(name))
-				return null;
-
-			var responses = _clientSettings.Clients[name];
-			var result = new List<ServiceClient>(responses.Count);
-			foreach (var data in responses)
-			{
-				var restClient = Map(data);
-				result.Add(restClient);
-
-			}
-			return result;
+			return _serviceClientContainer.GetAllRestClient(name);
 		}
 
 		public List<ServiceClient> GetRestClients()
 		{
-			var responses = _clientSettings.Clients;
-			var result = new List<ServiceClient>(responses.Count);
-			foreach (var list in responses.Values)
-			{
-				foreach (var data in list)
-				{
-					var restClient = Map(data);
-					result.Add(restClient);
-				}
-			}
-
-			return result;
+			return _serviceClientContainer.GetRestClients();
 		}
 
 		private static ServiceClient Map(CommonClientResponse data)
 		{
-			var restClient = new ServiceClient()
+			return new ServiceClient()
 			{
-				CallCount = data.CallCount,
 				Host = data.Host,
 				Name = data.Id,
 				Address = data.Address,
 				Port = data.Port
 			};
-			return restClient;
 		}
 	}
 }

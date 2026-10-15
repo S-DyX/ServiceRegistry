@@ -1,14 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
+﻿using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Service.Registry.Host
 {
+	/// <summary>
+	/// Logs requests at Debug level (method, path, status, duration). Request body is not buffered.
+	/// </summary>
 	public class RequestLoggingMiddleware
 	{
 		private readonly RequestDelegate _next;
@@ -22,59 +21,25 @@ namespace Service.Registry.Host
 
 		public async Task Invoke(HttpContext context)
 		{
-			context.Request.EnableBuffering();
+			if (!_logger.IsEnabled(LogLevel.Debug))
+			{
+				await _next(context);
+				return;
+			}
 
-			// Leave the body open so the next middleware can read it.
-
+			var stopwatch = Stopwatch.StartNew();
 			try
 			{
 				await _next(context);
 			}
 			finally
 			{
-
-				var content = GetDetails(context.Request);
-				if (content.Length > 10000)
-				{
-					_logger.LogInformation(
-						$"Request {context.Request?.Method} {context.Request?.Path.Value} => {context.Response?.StatusCode}, Request:{content}");
-				}
-				else
-				{
-					_logger.LogInformation(content);
-
-
-				}
+				stopwatch.Stop();
+				var request = context.Request;
+				_logger.LogDebug("{Protocol} {Method} {Path}{Query} => {StatusCode} in {Elapsed} ms",
+					request.Protocol, request.Method, request.Path.Value, request.QueryString.Value,
+					context.Response.StatusCode, stopwatch.ElapsedMilliseconds);
 			}
-		}
-		public static string GetDetails(HttpRequest request)
-		{
-			string baseUrl = $"{request.Scheme}://{request.Host}{request.Path}{request.QueryString.Value}";
-			StringBuilder sbHeaders = new StringBuilder();
-			string body = "no-body";
-			//foreach (var header in request.Headers)
-			//	sbHeaders.Append($"{header.Key}: {header.Value}\n");
-
-			//string body = "no-body";
-
-			//using (var reader = new StreamReader(
-			//	request.Body,
-			//	encoding: Encoding.UTF8,
-			//	detectEncodingFromByteOrderMarks: false,
-			//	bufferSize: 2222,
-			//	leaveOpen: true))
-			//{
-			//	request.Body.Position = 0;
-			//	body = reader.ReadToEndAsync().Result;
-			//	// Do some processing with body…
-
-			//	// Reset the request body stream position so the next middleware can read it
-			//	request.Body.Position = 0;
-			//}
-
-
-
-			return $"{request.Protocol} {request.Method} {baseUrl}\n\n{sbHeaders}\n{body}";
 		}
 	}
 }

@@ -1,43 +1,49 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Net.Http;
+using System.Threading;
 
 namespace Service.Registry.Common
 {
-    internal class InternalHttpClientFactory : IHttpClientFactory
+    /// <summary>
+    /// <see cref="IHttpClientFactory"/> used when no factory is supplied.
+    /// One thread-safe <see cref="HttpClient"/> per name; pooled connections are recycled
+    /// periodically so DNS / address changes are picked up.
+    /// </summary>
+    internal sealed class InternalHttpClientFactory : IHttpClientFactory
     {
-        private readonly Dictionary<string, Queue<HttpClient>> _clients = new Dictionary<string, Queue<HttpClient>>(20);
-        private readonly object _sync = new object();
+        private static readonly Lazy<InternalHttpClientFactory> DefaultInstance =
+            new Lazy<InternalHttpClientFactory>(() => new InternalHttpClientFactory(), LazyThreadSafetyMode.ExecutionAndPublication);
+
+        private readonly ConcurrentDictionary<string, Lazy<HttpClient>> _clients =
+            new ConcurrentDictionary<string, Lazy<HttpClient>>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Shared instance
+        /// </summary>
+        public static InternalHttpClientFactory Default => DefaultInstance.Value;
+
         public HttpClient CreateClient(string name)
         {
-            lock (_sync)
+            return _clients.GetOrAdd(name ?? string.Empty,
+                _ => new Lazy<HttpClient>(Create, LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+        }
+
+        private static HttpClient Create()
+        {
+            var handler = new SocketsHttpHandler
             {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(1),
+                MaxConnectionsPerServer = 64
+            };
 
-                if (!_clients.ContainsKey(name))
-                {
-                    var handler = new HttpClientHandler();
-                    handler.MaxConnectionsPerServer = 15;
-
-                    var httpClients = new Queue<HttpClient>(20);
-
-                    for (int i = 0; i < 20; i++)
-                    {
-                        var client = new HttpClient(handler)
-                        {
-                            Timeout = TimeSpan.FromSeconds(1),
-                        };
-                        httpClients.Enqueue(client);
-                    }
-                    _clients[name] = httpClients;
-                }
-
-                var queue = _clients[name];
-                var result = queue.Dequeue();
-                queue.Enqueue(result);
-                return result;
-
-            }
-
+            // Requests to the registry itself use their own short timeout (CancellationToken),
+            // REST clients may transfer large files, so the client timeout is long.
+            return new HttpClient(handler, disposeHandler: true)
+            {
+                Timeout = TimeSpan.FromMinutes(10)
+            };
         }
     }
 }

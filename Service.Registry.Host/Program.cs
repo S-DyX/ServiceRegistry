@@ -24,8 +24,11 @@ namespace Service.Registry.Host
 						 .UseServiceProviderFactory(new AutofacServiceProviderFactory())
 						 .ConfigureWebHostDefaults(webBuilder =>
 						 {
-							 webBuilder.UseUrls(jsonConfigurationRoot.GetSection("ServiceRegistry:Host").Value)
-							 .UseStartup<Startup>();
+							 // Docker: ServiceRegistry__Host=http://+:7777
+							 var urls = jsonConfigurationRoot["ServiceRegistry:Host"];
+							 if (!string.IsNullOrWhiteSpace(urls))
+								 webBuilder.UseUrls(urls);
+							 webBuilder.UseStartup<Startup>();
 						 });
 		}
 	}

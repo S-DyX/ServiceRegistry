@@ -38,14 +38,17 @@ namespace Service.Registry.Host
 				.RegisterType<ServiceClientContainer>()
 				.As<ServiceClientContainer>()
 				.SingleInstance();
+
 			builder
 				.RegisterType<ServiceRegistryClient>()
 				.As<IServiceRegistry>()
 				.SingleInstance();
 
+			// used by api/service/Test, resolved lazily (requires section "serviceRegistry")
 			builder
-				.RegisterType<ServiceRegistryClient>()
-				.As<IServiceRegistry>()
+				.Register(_ => new ServiceRegistryFactory())
+				.AsSelf()
+				.As<IServiceRegistryFactory>()
 				.SingleInstance();
 		}
 
@@ -56,7 +59,7 @@ namespace Service.Registry.Host
 			{
 				app.UseDeveloperExceptionPage();
 			}
-			app.UseMiddleware(typeof(RequestLoggingMiddleware));
+			app.UseMiddleware<RequestLoggingMiddleware>();
 			app.UseRouting();
 			app.UseEndpoints(endpoints =>
 			{

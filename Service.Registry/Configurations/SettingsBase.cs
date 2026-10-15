@@ -1,12 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System;
-using System.Collections.Generic;
-using System.Configuration;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
+using System.Threading;
 
 namespace Service.Registry.Configurations
 {
@@ -15,36 +10,27 @@ namespace Service.Registry.Configurations
 	/// </summary>
 	public abstract class SettingsBase
 	{
-		private static object _sync = new object();
-		private static IConfigurationRoot _configuration;
-		protected static IConfigurationRoot ConfigurationRoot
-		{
-			get
-			{
-				if (_configuration == null)
-				{
-					lock (_sync)
-						if (_configuration == null)
-						{
-							//to do надо переделать
-							TryLoad();
-						}
-				}
-				return _configuration;
-			}
-		}
+		private const string FileName = "appsettings.json";
 
-		private static void TryLoad()
+		private static readonly Lazy<IConfigurationRoot> Configuration =
+			new Lazy<IConfigurationRoot>(Load, LazyThreadSafetyMode.ExecutionAndPublication);
+
+		protected static IConfigurationRoot ConfigurationRoot => Configuration.Value;
+
+		private static IConfigurationRoot Load()
 		{
+			var directory = Directory.GetCurrentDirectory();
 			try
 			{
-				var builder = new ConfigurationBuilder()
-				.SetBasePath(Directory.GetCurrentDirectory())
-				.AddJsonFile("appsettings.json", optional: true, reloadOnChange: false);
-
-				_configuration = builder.Build();
+				return new ConfigurationBuilder()
+					.SetBasePath(directory)
+					.AddJsonFile(FileName, optional: true, reloadOnChange: false)
+					.Build();
 			}
-			catch { }
+			catch (Exception e)
+			{
+				throw new InvalidDataException($"Failed to load configuration file {Path.Combine(directory, FileName)}: {e.Message}", e);
+			}
 		}
 
 		/// <summary>
@@ -53,32 +39,28 @@ namespace Service.Registry.Configurations
 		protected abstract string SectionName { get; }
 
 		/// <summary>
-		/// Получаем элемент конфигурационной секции
+		/// Получаем обязательную конфигурационную секцию
 		/// </summary>
 		/// <returns></returns>
 		protected IConfigurationSection GetSection()
 		{
-			var section = ConfigurationRoot.GetSection(SectionName);
-
-			if (section == null)
-				throw new InvalidDataException($"Required section \"{SectionName}\" not found.");
-
-			return section;
+			return GetElement(false);
 		}
+
+		/// <summary>
+		/// Получаем конфигурационную секцию
+		/// </summary>
+		/// <param name="ignore">true - вернуть null, если секции нет</param>
+		/// <returns></returns>
 		protected IConfigurationSection GetElement(bool ignore)
 		{
 			var section = ConfigurationRoot.GetSection(SectionName);
+			if (section.Exists())
+				return section;
 
-			if (section == null)
-			{
-				if (ignore)
-					return null;
-				throw new InvalidDataException($"Required section \"{SectionName}\" not found.");
-			}
-
-			return section;
+			if (ignore)
+				return null;
+			throw new InvalidDataException($"Required section \"{SectionName}\" not found in {FileName}.");
 		}
-
-
 	}
 }

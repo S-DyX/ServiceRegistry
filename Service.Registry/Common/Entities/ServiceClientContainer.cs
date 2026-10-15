@@ -1,105 +1,156 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Service.Registry.Common.Entities
 {
-	
-
+	/// <summary>
+	/// Thread-safe storage of registered clients
+	/// </summary>
 	public sealed class ServiceClientContainer
 	{
-		private Dictionary<string, List<ServiceClient>> RestClientDictionary { get; set; }
-
-		public ServiceClientContainer()
-		{
-			RestClientDictionary = new Dictionary<string, List<ServiceClient>>();
-		}
+		private readonly Dictionary<string, List<ServiceClient>> _clients =
+			new Dictionary<string, List<ServiceClient>>(StringComparer.Ordinal);
+		private readonly object _sync = new object();
 
 		public void AddRestClient(ServiceClient settings)
 		{
-			List<ServiceClient> clients;
-			if (RestClientDictionary.TryGetValue(settings.Name, out clients))
-			{
-				clients.Add(settings);
-			}
-			else
-			{
-				RestClientDictionary.Add(settings.Name, new List<ServiceClient>() { settings });
-			}
+			if (!IsValid(settings))
+				return;
+			lock (_sync)
+				AddUnsafe(settings);
 		}
 
 		public void RemoveRestClient(ServiceClient settings)
 		{
-			List<ServiceClient> clients;
-			if (RestClientDictionary.TryGetValue(settings.Name, out clients))
-			{
-				var client = clients.SingleOrDefault(a => a.Host == settings.Host && a.Name == settings.Name);
-				if (client != null)
-				{
-					clients.Remove(client);
-				}
-			}
+			if (!IsValid(settings))
+				return;
+			lock (_sync)
+				RemoveUnsafe(settings);
 		}
 
+		/// <summary>
+		/// Returns the least used client and increments its call counter
+		/// </summary>
 		public ServiceClient GetRestClient(string name)
 		{
-			if (!RestClientDictionary.ContainsKey(name) || RestClientDictionary[name].Count <= 0)
+			if (string.IsNullOrEmpty(name))
 				return null;
-			var clients = RestClientDictionary[name];
-			clients.Sort((left, right) => left.CallCount - right.CallCount);
-			++clients.First().CallCount;
-			return clients.First();
 
+			lock (_sync)
+			{
+				if (!_clients.TryGetValue(name, out var clients) || clients.Count == 0)
+					return null;
+
+				var selected = clients[0];
+				for (var i = 1; i < clients.Count; i++)
+				{
+					if (clients[i].CallCount < selected.CallCount)
+						selected = clients[i];
+				}
+
+				if (selected.CallCount == int.MaxValue)
+				{
+					// all counters reached the limit
+					foreach (var client in clients)
+						client.CallCount = 0;
+				}
+
+				selected.CallCount++;
+				return Copy(selected);
+			}
 		}
+
 		public List<ServiceClient> GetAllRestClient(string name)
 		{
-			if (!RestClientDictionary.ContainsKey(name) || RestClientDictionary[name].Count <= 0)
+			if (string.IsNullOrEmpty(name))
 				return null;
-			var clients = RestClientDictionary[name];
-			return clients;
 
+			lock (_sync)
+			{
+				if (!_clients.TryGetValue(name, out var clients) || clients.Count == 0)
+					return null;
+				return clients.Select(Copy).ToList();
+			}
 		}
+
 		public List<ServiceClient> GetRestClients()
 		{
-			var result = new List<ServiceClient>();
-			foreach (var clients in RestClientDictionary)
+			lock (_sync)
 			{
-				result.AddRange(clients.Value);
+				return _clients.Values.SelectMany(x => x).Select(Copy).ToList();
 			}
-
-			return result;
 		}
 
 		public void AddRestClients(List<ServiceClient> restClients)
 		{
-			foreach (var client in restClients)
+			if (restClients == null)
+				return;
+
+			lock (_sync)
 			{
-				List<ServiceClient> clientList;
-				if (RestClientDictionary.TryGetValue(client.Name, out clientList))
-				{
-					if (clientList.FirstOrDefault(a => a.Host == client.Host) == null)
-						clientList.Add(client);
-				}
-				else
-				{
-					RestClientDictionary.Add(client.Name, new List<ServiceClient> { client });
-				}
+				foreach (var client in restClients.Where(IsValid))
+					AddUnsafe(client);
 			}
 		}
 
 		public void RemoveRestClients(List<ServiceClient> restClients)
 		{
-			foreach (var client in restClients)
-			{
-				if (!RestClientDictionary.ContainsKey(client.Name))
-					continue;
+			if (restClients == null)
+				return;
 
-				var clientList = RestClientDictionary[client.Name];
-				var clientToRemove = clientList.FirstOrDefault(a => a.Host == client.Host);
-				if (clientToRemove != null)
-				{
-					clientList.Remove(clientToRemove);
-				}
+			lock (_sync)
+			{
+				foreach (var client in restClients.Where(IsValid))
+					RemoveUnsafe(client);
 			}
+		}
+
+		private void AddUnsafe(ServiceClient client)
+		{
+			if (_clients.TryGetValue(client.Name, out var list))
+			{
+				if (!list.Any(x => IsSame(x, client)))
+					list.Add(Copy(client));
+			}
+			else
+			{
+				_clients.Add(client.Name, new List<ServiceClient> { Copy(client) });
+			}
+		}
+
+		private void RemoveUnsafe(ServiceClient client)
+		{
+			if (!_clients.TryGetValue(client.Name, out var list))
+				return;
+
+			list.RemoveAll(x => IsSame(x, client));
+			if (list.Count == 0)
+				_clients.Remove(client.Name);
+		}
+
+		private static bool IsValid(ServiceClient client)
+		{
+			return !string.IsNullOrEmpty(client?.Name);
+		}
+
+		private static bool IsSame(ServiceClient left, ServiceClient right)
+		{
+			return string.Equals(left.Host, right.Host, StringComparison.OrdinalIgnoreCase)
+				   && string.Equals(left.Address, right.Address, StringComparison.OrdinalIgnoreCase)
+				   && left.Port == right.Port;
+		}
+
+		private static ServiceClient Copy(ServiceClient client)
+		{
+			return new ServiceClient
+			{
+				Name = client.Name,
+				Host = client.Host,
+				Address = client.Address,
+				Port = client.Port,
+				CallCount = client.CallCount
+			};
 		}
 	}
 }
