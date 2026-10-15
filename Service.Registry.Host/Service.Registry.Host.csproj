@@ -10,6 +10,8 @@
     <RepositoryUrl>https://bitbucket.org/SBatyrgareev/serviceregistry/src</RepositoryUrl>
     <UserSecretsId>d65d2e5d-2a71-48e8-bbfd-ed62d56ba7d8</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <!-- the Dockerfile copies all projects of the solution: build context is the solution folder -->
+    <DockerfileContext>..</DockerfileContext>
   </PropertyGroup>
 
   <ItemGroup>

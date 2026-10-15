@@ -19,6 +19,15 @@
       "commandName": "Project",
       "launchBrowser": false,
       "applicationUrl": "http://localhost:7777"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker",
+      "launchBrowser": true,
+      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}/api/service/all",
+      "environmentVariables": {
+        "ServiceRegistry__Host": "http://+:80"
+      },
+      "httpPort": 7777
     }
   }
 }
